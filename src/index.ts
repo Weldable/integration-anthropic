@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { defineIntegration, IntegrationAuthError, IntegrationValidationError } from '@weldable/integration-core'
+import { defineIntegration, IntegrationAuthError, IntegrationBillingError, IntegrationValidationError } from '@weldable/integration-core'
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6'
 
@@ -77,6 +77,7 @@ export default defineIntegration({
       placeholder: 'sk-ant-...',
     },
   ],
+  billingUrl: 'https://console.anthropic.com/settings/billing',
   exampleUsage: "Summarize this report and highlight the key takeaways",
   actions: [
     {
@@ -190,6 +191,11 @@ export default defineIntegration({
         } catch (err) {
           if (err instanceof Anthropic.AuthenticationError) {
             throw new IntegrationAuthError('invalid_api_key')
+          }
+          if (err instanceof Anthropic.BadRequestError && /credit balance is too low/i.test(err.message)) {
+            throw new IntegrationBillingError(
+              'Your Anthropic credit balance is too low. Add credits and resume this run.',
+            )
           }
           throw err
         }
