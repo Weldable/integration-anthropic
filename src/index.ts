@@ -138,6 +138,34 @@ export default defineIntegration({
         { name: 'model', type: 'string', description: 'The Claude model that generated the response.' },
         { name: 'stop_reason', type: 'string', description: 'Why the response ended: "end_turn", "max_tokens", or "stop_sequence".' },
       ],
+      mockExecute: async (args, _ctx) => {
+        const schema = args.schema && typeof args.schema === 'object' && !Array.isArray(args.schema)
+          ? (args.schema as Record<string, unknown>)
+          : undefined
+        const model = typeof args.model === 'string' && args.model ? args.model : 'claude-sonnet-4-6'
+        if (schema) {
+          const props = schema.properties
+          const result: Record<string, unknown> = {}
+          if (props && typeof props === 'object') {
+            for (const [key, def] of Object.entries(props as Record<string, unknown>)) {
+              const fieldDef = def as Record<string, unknown>
+              const type = fieldDef.type
+              if (type === 'string') result[key] = `mock-${key}`
+              else if (type === 'number' || type === 'integer') result[key] = 0
+              else if (type === 'boolean') result[key] = false
+              else if (type === 'array') result[key] = []
+              else if (type === 'object') result[key] = {}
+              else result[key] = null
+            }
+          }
+          return { ...result, model, stop_reason: 'end_turn' }
+        }
+        return {
+          textOutput: 'This is a mock LLM response for workflow authoring.',
+          model,
+          stop_reason: 'end_turn',
+        }
+      },
       execute: async (args, ctx) => {
         const { token: apiKey } = ctx.getCredentials()
         if (!apiKey) {
