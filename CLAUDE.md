@@ -1,32 +1,11 @@
 # @weldable/integration-anthropic
 
-Anthropic Claude API actions for the Weldable integration ecosystem.
+This is one integration in the Weldable integrations family. Conventions, action authoring patterns, error classes, and the release process are documented canonically in **[integration-core's CLAUDE.md](https://github.com/weldable/integration-core/blob/main/CLAUDE.md)** — read that first for any non-trivial change.
 
-## Layout
+## Local quirks
 
-```
-src/
-  index.ts   — defines the integration via defineIntegration() from @weldable/integration-core
-```
-
-The single exported action (`anthropic.llm`) calls the Anthropic Messages API using `@anthropic-ai/sdk`.
-
-## Dev workflow
-
-```bash
-npm install
-npm run build   # tsc → dist/
-npm run dev     # watch mode
-```
-
-`dist/` is gitignored and built by CI before publishing — do not commit it.
+- Uses `@anthropic-ai/sdk` directly rather than `createRestHandler`. The `execute` handler is a plain async function that calls the SDK with the API key from `ctx.getCredentials()`. Auth type is `api_key` with a `configSchema` for the key field.
 
 ## Releasing
 
-Bump `version` in `package.json`, commit to `main`, push. `publish.yml` handles the rest (build, publish to npm, tag, GitHub release).
-
-Use the `/commit` skill — it handles the version bump, build check, and push.
-
-## Contributing
-
-See [CONTRIBUTING.md in integration-core](https://github.com/weldable/integration-core/blob/main/CONTRIBUTING.md) for the full workflow, peer dependency policy, and how to create a new integration.
+Use the `/commit` skill — it handles the version bump, build check, and push to trigger the automated npm publish.
