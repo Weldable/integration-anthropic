@@ -37,11 +37,11 @@
   "author": "Weldable",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/weldable/integration-anthropic.git"
+    "url": "git+https://github.com/Weldable/integration-anthropic.git"
   },
-  "homepage": "https://github.com/weldable/integration-anthropic#readme",
+  "homepage": "https://github.com/Weldable/integration-anthropic#readme",
   "bugs": {
-    "url": "https://github.com/weldable/integration-anthropic/issues"
+    "url": "https://github.com/Weldable/integration-anthropic/issues"
   },
   "keywords": [
     "weldable",
