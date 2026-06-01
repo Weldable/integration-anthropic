@@ -9,6 +9,23 @@ const ALLOWED_MODELS = new Set([
   'claude-opus-4-6',
 ])
 
+function toContentBlocks(input: unknown[], field: string): Anthropic.TextBlockParam[] {
+  return input.map((block, i) => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      throw new IntegrationValidationError(`"${field}[${i}]" must be an object with a "text" field`, field)
+    }
+    const b = block as Record<string, unknown>
+    if (typeof b.text !== 'string') {
+      throw new IntegrationValidationError(`"${field}[${i}].text" must be a string`, field)
+    }
+    const out: Anthropic.TextBlockParam = { type: 'text', text: b.text }
+    if (b.cache === true) {
+      out.cache_control = { type: 'ephemeral' }
+    }
+    return out
+  })
+}
+
 /**
  * Recursively inject `additionalProperties: false` into all object schemas.
  * The Anthropic structured output API requires it.
@@ -104,7 +121,7 @@ export default defineIntegration({
           name: 'prompt',
           type: 'string',
           required: true,
-          description: 'The question or task to send to Claude.',
+          description: 'The user message. A plain string for simple calls, or an array of blocks for prompt caching: [{ text: "...", cache: true }, { text: "..." }]. Mark stable prefix blocks with cache: true; variable content should be the last block without cache: true.',
         },
         {
           name: 'model',
@@ -117,7 +134,7 @@ export default defineIntegration({
           name: 'system',
           type: 'string',
           required: false,
-          description: 'Optional system prompt to set context or persona.',
+          description: 'Optional system prompt. A plain string, or an array of blocks with optional cache: true markers: [{ text: "...", cache: true }].',
         },
         {
           name: 'max_tokens',
@@ -142,7 +159,7 @@ export default defineIntegration({
         const schema = args.schema && typeof args.schema === 'object' && !Array.isArray(args.schema)
           ? (args.schema as Record<string, unknown>)
           : undefined
-        const model = typeof args.model === 'string' && args.model ? args.model : 'claude-sonnet-4-6'
+        const model = typeof args.model === 'string' && args.model ? args.model : DEFAULT_MODEL
         if (schema) {
           const props = schema.properties
           const result: Record<string, unknown> = {}
@@ -172,12 +189,15 @@ export default defineIntegration({
           throw new IntegrationAuthError('missing_api_key')
         }
 
-        const prompt = args.prompt
-        if (typeof prompt !== 'string' || !prompt) {
-          throw new IntegrationValidationError('"prompt" is required and must be a string', 'prompt')
+        const promptInput = args.prompt
+        if (promptInput == null || (typeof promptInput !== 'string' && !Array.isArray(promptInput))) {
+          throw new IntegrationValidationError('"prompt" is required and must be a string or array of blocks', 'prompt')
+        }
+        if (typeof promptInput === 'string' && !promptInput) {
+          throw new IntegrationValidationError('"prompt" is required and must be a string or array of blocks', 'prompt')
         }
 
-        const system = typeof args.system === 'string' ? args.system : ''
+        const systemInput = args.system
         const schema = args.schema && typeof args.schema === 'object' && !Array.isArray(args.schema)
           ? (args.schema as Record<string, unknown>)
           : undefined
@@ -197,14 +217,24 @@ export default defineIntegration({
 
         const client = new Anthropic({ apiKey })
 
+        const userContent: string | Anthropic.TextBlockParam[] = Array.isArray(promptInput)
+          ? toContentBlocks(promptInput, 'prompt')
+          : promptInput
+
         const createParams: Anthropic.MessageCreateParamsNonStreaming = {
           model,
           max_tokens: maxTokens,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{ role: 'user', content: userContent }],
         }
 
-        if (system) {
-          createParams.system = system
+        if (systemInput != null && systemInput !== '') {
+          if (Array.isArray(systemInput)) {
+            createParams.system = toContentBlocks(systemInput, 'system')
+          } else if (typeof systemInput === 'string') {
+            createParams.system = systemInput
+          } else {
+            throw new IntegrationValidationError('"system" must be a string or array of blocks', 'system')
+          }
         }
 
         if (schema) {
@@ -236,6 +266,8 @@ export default defineIntegration({
         const usage = {
           inputTokens: message.usage.input_tokens,
           outputTokens: message.usage.output_tokens,
+          cacheCreationInputTokens: message.usage.cache_creation_input_tokens ?? 0,
+          cacheReadInputTokens: message.usage.cache_read_input_tokens ?? 0,
         }
 
         if (schema) {

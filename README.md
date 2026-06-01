@@ -31,6 +31,24 @@ const result = await action.execute(
 console.log(result.content) // "Node.js is a V8-powered JavaScript runtime for server-side execution."
 ```
 
+## Prompt caching
+
+Pass `prompt` (or `system`) as an array of blocks to cache stable prefix content across repeated calls within the same run:
+
+```yaml
+- uses: anthropic.llm
+  with:
+    system: "You are a career advisor..."
+    prompt:
+      - text: "{{ steps.read_resume.output.markdown }}"
+        cache: true
+      - text: "Evaluate this job: {{ job.title }} at {{ job.company }}"
+```
+
+Mark stable blocks with `cache: true`; the last block (variable per-call content) should not be marked. On the first call within a 5-minute window, the marked blocks are written to cache (1.25× the normal input price). Subsequent calls within that window that share the same prefix read from cache at 0.1× the normal price — a 10× discount.
+
+Check `usage.cacheCreationInputTokens` (> 0 on write) and `usage.cacheReadInputTokens` (> 0 on hit) in the step output to verify caching is active. Note: Sonnet 4.6 requires at least 1,024 tokens in the cached prefix; below that threshold the `cache: true` marker is silently ignored.
+
 ## Contributing and releasing
 
 See [CONTRIBUTING.md](https://github.com/weldable/integration-core/blob/main/CONTRIBUTING.md) in `@weldable/integration-core` for the development workflow and release process.
