@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -29,7 +30,8 @@ jobs:
           CURRENT=$(jq -r .version package.json)
           PREVIOUS=$(git show HEAD~1:package.json 2>/dev/null | jq -r .version || echo "")
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
-          if [ "$CURRENT" != "$PREVIOUS" ]; then
+          # workflow_dispatch always publishes; push only if version changed
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$CURRENT" != "$PREVIOUS" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
